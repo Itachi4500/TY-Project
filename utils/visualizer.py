@@ -195,64 +195,163 @@ def show_visuals(df):
         else:
             st.warning("At least two numeric columns are required for a pair plot.")
 
+    # ... (rest of your code remains unchanged above)
+
     elif analysis_type == "Hypothesis Testing":
-        st.markdown("Perform statistical tests to check hypotheses about the data.")
-        
-        test_type = st.sidebar.selectbox("Select Test", ["Independent T-test", "ANOVA (One-Way)"])
+        st.markdown("Perform a variety of statistical tests and view assumptions, results, and visualizations.")
+
+        st.sidebar.markdown("### Test Configuration")
+        test_type = st.sidebar.selectbox("Select Test", [
+            "Independent T-test",
+            "Paired T-test",
+            "Welch's T-test (Unequal Variance)",
+            "Mann–Whitney U Test (Non-parametric)",
+            "ANOVA (One-Way)",
+            "Chi-square Test",
+        ])
+
+        # Helper for variable selection
+        def get_var_select(numeric_req=1, cat_req=1, pair_req=False, unique_min=None, unique_max=None):
+            num = st.sidebar.selectbox("Numeric Variable", numeric_cols) if numeric_req else None
+            cat = st.sidebar.selectbox("Categorical Variable", cat_cols) if cat_req else None
+            pair = None
+            if pair_req:
+                pair = st.sidebar.selectbox("Paired Numeric Variable", [col for col in numeric_cols if col != num])
+            # Unique group checks
+            if cat and unique_min:
+                n_unique = df[cat].nunique()
+                if n_unique < unique_min:
+                    st.error(f"Categorical variable must have at least {unique_min} unique values.")
+                    return None, None, None
+            if cat and unique_max:
+                n_unique = df[cat].nunique()
+                if n_unique > unique_max:
+                    st.error(f"Categorical variable must have at most {unique_max} unique values.")
+                    return None, None, None
+            return num, cat, pair
+
+        # Effect size calculator
+        def cohen_d(x, y):
+            nx, ny = len(x), len(y)
+            pooled_std = np.sqrt(((nx-1)*np.var(x, ddof=1) + (ny-1)*np.var(y, ddof=1)) / (nx + ny - 2))
+            return (np.mean(x) - np.mean(y)) / pooled_std if pooled_std else 0
 
         if test_type == "Independent T-test":
             st.markdown("#### Independent Samples T-test")
-            st.write("Compares the means for two independent groups.")
-            
-            if len(numeric_cols) > 0 and len(cat_cols) > 0:
-                numeric_var = st.selectbox("Select Numeric Variable (to compare)", numeric_cols)
-                cat_var = st.selectbox("Select Categorical Variable (with 2 groups)", cat_cols)
-                
-                if df[cat_var].nunique() == 2:
-                    groups = df[cat_var].unique()
-                    group1 = df[df[cat_var] == groups[0]][numeric_var].dropna()
-                    group2 = df[df[cat_var] == groups[1]][numeric_var].dropna()
+            num, cat, _ = get_var_select(numeric_req=1, cat_req=1, unique_min=2, unique_max=2)
+            if num and cat:
+                groups = df[cat].unique()
+                group1 = df[df[cat] == groups[0]][num].dropna()
+                group2 = df[df[cat] == groups[1]][num].dropna()
+                st.write(f"Comparing `{num}` between {groups[0]} and {groups[1]}")
+                st.pyplot(sns.boxplot(x=df[cat], y=df[num]))
+                if st.button("Run T-test"):
+                    t_stat, p_value = stats.ttest_ind(group1, group2)
+                    st.write(f"T-statistic: `{t_stat:.4f}` | P-value: `{p_value:.4f}`")
+                    st.write(f"Cohen's d: `{cohen_d(group1, group2):.4f}`")
+                    st.write("Sample sizes:", len(group1), len(group2))
+                    st.write(f"Means: {np.mean(group1):.2f}, {np.mean(group2):.2f}")
+                    st.write(f"Std dev: {np.std(group1, ddof=1):.2f}, {np.std(group2, ddof=1):.2f}")
 
-                    if st.button("Run T-test"):
-                        t_stat, p_value = stats.ttest_ind(group1, group2)
-                        st.write(f"**Results for {numeric_var} between '{groups[0]}' and '{groups[1]}':**")
-                        st.write(f"T-statistic: `{t_stat:.4f}`")
-                        st.write(f"P-value: `{p_value:.4f}`")
+        elif test_type == "Paired T-test":
+            st.markdown("#### Paired Samples T-test")
+            num1 = st.sidebar.selectbox("Numeric Variable 1", numeric_cols)
+            num2 = st.sidebar.selectbox("Numeric Variable 2 (paired)", [col for col in numeric_cols if col != num1])
+            st.write(f"Comparing paired samples: `{num1}` vs `{num2}`")
+            df_paired = df[[num1, num2]].dropna()
+            st.pyplot(sns.boxplot(data=df_paired))
+            if st.button("Run Paired T-test"):
+                t_stat, p_value = stats.ttest_rel(df_paired[num1], df_paired[num2])
+                st.write(f"T-statistic: `{t_stat:.4f}` | P-value: `{p_value:.4f}`")
+                st.write(f"Mean difference: {(df_paired[num1] - df_paired[num2]).mean():.4f}")
 
-                        alpha = 0.05
-                        if p_value < alpha:
-                            st.success(f"The difference in means is statistically significant (p < {alpha}). We reject the null hypothesis.")
-                        else:
-                            st.info(f"The difference in means is not statistically significant (p >= {alpha}). We fail to reject the null hypothesis.")
-                else:
-                    st.error(f"The selected categorical variable '{cat_var}' has {df[cat_var].nunique()} unique values. Please choose a variable with exactly 2 groups for a T-test.")
-            else:
-                st.warning("T-tests require at least one numeric and one categorical column.")
+        elif test_type == "Welch's T-test (Unequal Variance)":
+            st.markdown("#### Welch's T-test")
+            num, cat, _ = get_var_select(numeric_req=1, cat_req=1, unique_min=2, unique_max=2)
+            if num and cat:
+                groups = df[cat].unique()
+                group1 = df[df[cat] == groups[0]][num].dropna()
+                group2 = df[df[cat] == groups[1]][num].dropna()
+                st.pyplot(sns.boxplot(x=df[cat], y=df[num]))
+                if st.button("Run Welch's T-test"):
+                    t_stat, p_value = stats.ttest_ind(group1, group2, equal_var=False)
+                    st.write(f"Welch's T-statistic: `{t_stat:.4f}` | P-value: `{p_value:.4f}`")
+                    st.write(f"Cohen's d: `{cohen_d(group1, group2):.4f}`")
+
+        elif test_type == "Mann–Whitney U Test (Non-parametric)":
+            st.markdown("#### Mann–Whitney U Test")
+            num, cat, _ = get_var_select(numeric_req=1, cat_req=1, unique_min=2, unique_max=2)
+            if num and cat:
+                groups = df[cat].unique()
+                group1 = df[df[cat] == groups[0]][num].dropna()
+                group2 = df[df[cat] == groups[1]][num].dropna()
+                st.pyplot(sns.violinplot(x=df[cat], y=df[num]))
+                if st.button("Run Mann–Whitney U Test"):
+                    u_stat, p_value = stats.mannwhitneyu(group1, group2, alternative='two-sided')
+                    st.write(f"Mann–Whitney U statistic: `{u_stat:.4f}` | P-value: `{p_value:.4f}`")
+                    st.write(f"Median: {np.median(group1):.2f}, {np.median(group2):.2f}")
 
         elif test_type == "ANOVA (One-Way)":
             st.markdown("#### One-Way ANOVA")
-            st.write("Compares the means of three or more independent groups.")
+            num, cat, _ = get_var_select(numeric_req=1, cat_req=1, unique_min=3)
+            if num and cat:
+                groups = df[cat].unique()
+                samples = [df[df[cat] == g][num].dropna() for g in groups]
+                st.pyplot(sns.boxplot(x=df[cat], y=df[num]))
+                if st.button("Run ANOVA"):
+                    f_stat, p_value = stats.f_oneway(*samples)
+                    st.write(f"F-statistic: `{f_stat:.4f}` | P-value: `{p_value:.4f}`")
+                    # Effect size eta squared
+                    grand_mean = df[num].mean()
+                    ss_between = sum([len(s)*((s.mean()-grand_mean)**2) for s in samples])
+                    ss_total = sum((df[num]-grand_mean)**2)
+                    eta_sq = ss_between / ss_total if ss_total else 0
+                    st.write(f"Eta squared: `{eta_sq:.4f}`")
 
-            if len(numeric_cols) > 0 and len(cat_cols) > 0:
-                numeric_var = st.selectbox("Select Numeric Variable (to compare)", numeric_cols, key="anova_num")
-                cat_var = st.selectbox("Select Categorical Variable (with 3+ groups)", cat_cols, key="anova_cat")
+        elif test_type == "Chi-square Test":
+            st.markdown("#### Chi-square Test of Independence")
+            cat1 = st.sidebar.selectbox("Categorical Variable 1", cat_cols)
+            cat2 = st.sidebar.selectbox("Categorical Variable 2", [col for col in cat_cols if col != cat1])
+            table = pd.crosstab(df[cat1], df[cat2])
+            st.write("Contingency Table:")
+            st.dataframe(table)
+            if st.button("Run Chi-square Test"):
+                chi2, p, dof, ex = stats.chi2_contingency(table)
+                st.write(f"Chi-square statistic: `{chi2:.4f}` | P-value: `{p:.4f}` | df: `{dof}`")
+                st.write("Expected frequencies:")
+                st.dataframe(pd.DataFrame(ex, index=table.index, columns=table.columns))
 
-                if df[cat_var].nunique() > 2:
-                    groups = df[cat_var].unique()
-                    samples = [df[df[cat_var] == g][numeric_var].dropna() for g in groups]
+        # Multiple comparison corrections
+        if st.sidebar.checkbox("Show correction options for multiple tests", value=False):
+            st.sidebar.markdown("#### Multiple Testing Correction")
+            correction = st.sidebar.selectbox("Correction Method", [
+                "None", "Bonferroni", "Holm", "Benjamini/Hochberg"
+            ])
+            st.info(f"Selected: {correction} (not applied automatically, see scipy.stats/multipletests for implementation)")
 
-                    if st.button("Run ANOVA"):
-                        f_stat, p_value = stats.f_oneway(*samples)
-                        st.write(f"**Results for {numeric_var} across groups in '{cat_var}':**")
-                        st.write(f"F-statistic: `{f_stat:.4f}`")
-                        st.write(f"P-value: `{p_value:.4f}`")
-
-                        alpha = 0.05
-                        if p_value < alpha:
-                            st.success(f"There is a statistically significant difference in means between at least two groups (p < {alpha}). We reject the null hypothesis.")
-                        else:
-                            st.info(f"There is no statistically significant difference in means between the groups (p >= {alpha}). We fail to reject the null hypothesis.")
+        # Show test assumptions
+        if st.sidebar.checkbox("Show test assumptions and checks", value=True):
+            st.markdown("#### Test Assumptions & Checks")
+            st.write("Check normality, sample size, variance, etc. for your selected variables.")
+            # Example: Normality check for selected numeric variable
+            if 'num' in locals() and num:
+                st.write("Normality check (Shapiro-Wilk):")
+                stat, p = stats.shapiro(df[num].dropna())
+                st.write(f"Statistic: `{stat:.4f}` | P-value: `{p:.4f}`")
+                if p < 0.05:
+                    st.warning("Data is likely **not normal** (p < 0.05). Consider non-parametric tests.")
                 else:
-                    st.error(f"The selected categorical variable '{cat_var}' has {df[cat_var].nunique()} unique values. Please choose a variable with 3 or more groups for ANOVA.")
-            else:
-                st.warning("ANOVA requires at least one numeric and one categorical column.")
+                    st.success("Data is likely **normal** (p >= 0.05).")
+
+            # Example: Variance check for two groups (Levene's Test)
+            if test_type in ["Independent T-test", "Welch's T-test (Unequal Variance)", "Mann–Whitney U Test (Non-parametric)"] and 'group1' in locals() and 'group2' in locals():
+                stat, p = stats.levene(group1, group2)
+                st.write("Levene's Test for equal variances:")
+                st.write(f"Statistic: `{stat:.4f}` | P-value: `{p:.4f}`")
+                if p < 0.05:
+                    st.warning("Groups likely have **unequal variances** (p < 0.05).")
+                else:
+                    st.success("Groups likely have **equal variances** (p >= 0.05).")
+
+        st.markdown("---")
+        st.write("**Tip:** For more advanced tests, see [statsmodels](https://www.statsmodels.org/) or [scipy.stats docs](https://docs.scipy.org/doc/scipy/reference/stats.html).")
