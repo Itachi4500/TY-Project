@@ -6,17 +6,16 @@ import io
 import json
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score, GridSearchCV
-from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, ConfusionMatrixDisplay
-from sklearn.inspection import permutation_importance
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from imblearn.over_sampling import SMOTE
 import shap
 
-def powerbi_pipeline(df):
+def powerbi_pipeline(df: pd.DataFrame) -> pd.DataFrame:
     st.title("📊 Power BI Style Dashboard (Advanced)")
     if df.empty:
         st.warning("⚠️ Uploaded dataset is empty. Please upload a valid file.")
-        return
+        return df
 
     overview_tab, transform_tab, dashboard_tab, insights_tab, ml_tab, adv_tab = st.tabs([
         "📁 Data Overview", "🛠️ Data Transformation", "📈 Custom Dashboard", "📌 Auto Insights", "🤖 ML Predictions", "🔬 Advanced Analytics"
@@ -39,7 +38,7 @@ def powerbi_pipeline(df):
 
 # ------------------ Helper Functions ------------------
 
-def show_data_overview(df):
+def show_data_overview(df: pd.DataFrame) -> None:
     st.subheader("📁 Data Summary")
     st.write(df.head())
     st.write("Shape:", df.shape)
@@ -51,10 +50,10 @@ def show_data_overview(df):
 
     # Correlation heatmap
     st.markdown("### 🔥 Correlation Heatmap")
-    num_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    num_cols = df.select_dtypes(include=[np.number]).columns
     if len(num_cols) >= 2:
         corr = df[num_cols].corr()
-        fig = px.imshow(corr, text_auto=True, title="Correlation Heatmap")
+        fig = px.imshow(corr, text_auto=True, title="Correlation Heatmap", color_continuous_scale="RdBu_r")
         st.plotly_chart(fig, use_container_width=True)
 
     # Outlier detection
@@ -69,14 +68,14 @@ def show_data_overview(df):
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Rows", df.shape[0])
     col2.metric("Total Columns", df.shape[1])
-    col3.metric("Missing Values", df.isnull().sum().sum())
+    col3.metric("Missing Values", int(df.isnull().sum().sum()))
 
     st.markdown("### 📊 Histograms")
     for col in num_cols:
         fig = px.histogram(df, x=col, title=f"Histogram of {col}")
         st.plotly_chart(fig, use_container_width=True)
 
-def transform_data(df):
+def transform_data(df: pd.DataFrame) -> pd.DataFrame:
     st.subheader("🛠️ Data Cleaning & Normalization")
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(include='object').columns.tolist()
@@ -87,11 +86,11 @@ def transform_data(df):
     if impute_strategy != "None":
         for col in num_cols:
             if impute_strategy == "Mean":
-                df[col].fillna(df[col].mean(), inplace=True)
+                df[col] = df[col].fillna(df[col].mean())
             elif impute_strategy == "Median":
-                df[col].fillna(df[col].median(), inplace=True)
+                df[col] = df[col].fillna(df[col].median())
             elif impute_strategy == "Zero":
-                df[col].fillna(0, inplace=True)
+                df[col] = df[col].fillna(0)
         st.success("✅ Missing values imputed.")
 
     # Categorical encoding
@@ -112,16 +111,18 @@ def transform_data(df):
 
     st.subheader("📏 KPI Metrics")
     kpi_cols = st.multiselect("KPI metric columns", num_cols, default=num_cols)
+    kpi_cols = kpi_cols if kpi_cols else []
     for col in kpi_cols:
-        st.metric(f"Mean of {col}", round(df[col].mean(), 2))
-        st.metric(f"Max of {col}", round(df[col].max(), 2))
-        st.metric(f"Min of {col}", round(df[col].min(), 2))
+        col1, col2, col3 = st.columns(3)
+        col1.metric(f"Mean of {col}", round(df[col].mean(), 2))
+        col2.metric(f"Max of {col}", round(df[col].max(), 2))
+        col3.metric(f"Min of {col}", round(df[col].min(), 2))
 
     # Download cleaned data
     st.download_button("⬇️ Download Cleaned Data", df.to_csv(index=False), file_name="cleaned_data.csv", mime="text/csv")
     return df
 
-def create_custom_dashboard(df):
+def create_custom_dashboard(df: pd.DataFrame) -> None:
     st.subheader("🎯 Create Custom Dashboard")
     filter_col = st.selectbox("🔍 Select column to filter", ["None"] + list(df.columns))
     selected_vals = None
@@ -135,7 +136,8 @@ def create_custom_dashboard(df):
         return
 
     x_axis = st.selectbox("Select X-axis Column", df.columns)
-    y_axis = st.selectbox("Select Y-axis Column", df.select_dtypes(include=np.number).columns)
+    y_axis_options = df.select_dtypes(include=np.number).columns
+    y_axis = st.selectbox("Select Y-axis Column", y_axis_options) if len(y_axis_options) > 0 else None
     chart_type = st.radio("Select Chart Type", ["Bar", "Line", "Scatter", "Area", "Pie", "Box"])
 
     fig = generate_chart(df, x_axis, y_axis, chart_type)
@@ -144,7 +146,7 @@ def create_custom_dashboard(df):
         export_chart(fig)
         save_load_config(x_axis, y_axis, chart_type, filter_col, selected_vals if filter_col != "None" else None)
 
-def generate_chart(df, x_axis, y_axis, chart_type):
+def generate_chart(df: pd.DataFrame, x_axis: str, y_axis: str, chart_type: str):
     if chart_type == "Bar":
         return px.bar(df, x=x_axis, y=y_axis, title=f"{y_axis} vs {x_axis}")
     elif chart_type == "Line":
@@ -159,14 +161,17 @@ def generate_chart(df, x_axis, y_axis, chart_type):
         return px.box(df, x=x_axis, y=y_axis, title=f"Box Plot of {y_axis} by {x_axis}")
     return None
 
-def export_chart(fig):
+def export_chart(fig) -> None:
     st.markdown("### 📤 Export Chart")
-    img_bytes = fig.to_image(format="png")
-    st.download_button("📸 Download as PNG", data=img_bytes, file_name="chart.png", mime="image/png")
+    try:
+        img_bytes = fig.to_image(format="png")
+        st.download_button("📸 Download as PNG", data=img_bytes, file_name="chart.png", mime="image/png")
+    except Exception as e:
+        st.info(f"PNG export not available: {e}")
     html = fig.to_html()
     st.download_button("📄 Download as HTML", data=html.encode(), file_name="chart.html", mime="text/html")
 
-def save_load_config(x, y, chart_type, filter_col, selected_vals):
+def save_load_config(x: str, y: str, chart_type: str, filter_col: str, selected_vals) -> None:
     config = {
         "x_axis": x,
         "y_axis": y,
@@ -185,10 +190,10 @@ def save_load_config(x, y, chart_type, filter_col, selected_vals):
         except Exception as e:
             st.error(f"Failed to load config: {e}")
 
-def auto_insights(df):
+def auto_insights(df: pd.DataFrame) -> None:
     st.subheader("📌 Auto Insights")
     num_cols = df.select_dtypes(include=np.number).columns
-    if num_cols.empty:
+    if len(num_cols) == 0:
         st.warning("No numeric columns available.")
         return
     col = st.selectbox("Select a numeric column", num_cols)
@@ -206,7 +211,7 @@ def auto_insights(df):
         outliers = df[(df[col] < (q1 - 1.5 * iqr)) | (df[col] > (q3 + 1.5 * iqr))]
         st.write(f"Outliers detected: {len(outliers)}")
 
-def run_advanced_ml(df):
+def run_advanced_ml(df: pd.DataFrame) -> None:
     st.subheader("🤖 ML Classifier: Random Forest (Advanced)")
     cols = df.select_dtypes(include=[np.number, 'object']).columns.tolist()
     if len(cols) < 2:
@@ -214,7 +219,7 @@ def run_advanced_ml(df):
         return
 
     label_col = st.selectbox("🎯 Target Column", cols)
-    feature_cols = st.multiselect("🧩 Feature Columns", [c for c in cols if c != label_col])
+    feature_cols = st.multiselect("🧩 Feature Columns", [c for c in cols if c != label_col], default=[c for c in cols if c != label_col])
 
     smote_on = st.checkbox("Apply SMOTE for class imbalance (classification only)", value=True)
     crossval_on = st.checkbox("Use Stratified 5-Fold Cross-Validation", value=True)
@@ -234,7 +239,7 @@ def run_advanced_ml(df):
                 except Exception as e:
                     st.warning(f"SMOTE failed: {e}")
 
-            model = RandomForestClassifier()
+            model = RandomForestClassifier(random_state=42)
             params = {"n_estimators": [100, 200], "max_depth": [None, 5, 10]}
             if gridsearch_on:
                 model = GridSearchCV(model, params, cv=3)
@@ -245,8 +250,9 @@ def run_advanced_ml(df):
                 scores = cross_val_score(model, X, y, cv=cv, scoring="accuracy")
                 st.write(f"Cross-Validation Scores: {scores}")
                 st.write(f"Mean Accuracy: {scores.mean():.3f}")
-                # Fit on full data for reporting
                 model.fit(X, y)
+                y_pred = model.predict(X)
+                cm = confusion_matrix(y, y_pred)
             else:
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
                 model.fit(X_train, y_train)
@@ -254,12 +260,7 @@ def run_advanced_ml(df):
                 st.dataframe(pd.DataFrame(classification_report(y_test, y_pred, output_dict=True)).transpose())
                 score = model.score(X_test, y_test)
                 st.metric("Test Accuracy", f"{score:.3f}")
-
-                # Confusion Matrix
                 cm = confusion_matrix(y_test, y_pred)
-                st.markdown("### Confusion Matrix")
-                cm_fig = px.imshow(cm, text_auto=True, color_continuous_scale='Blues', title="Confusion Matrix")
-                st.plotly_chart(cm_fig, use_container_width=True)
 
                 # ROC AUC if binary
                 if len(np.unique(y)) == 2:
@@ -267,15 +268,23 @@ def run_advanced_ml(df):
                     auc = roc_auc_score(y_test, y_proba)
                     st.metric("ROC-AUC", f"{auc:.3f}")
 
+            # Confusion Matrix
+            st.markdown("### Confusion Matrix")
+            cm_fig = px.imshow(cm, text_auto=True, color_continuous_scale='Blues', title="Confusion Matrix")
+            st.plotly_chart(cm_fig, use_container_width=True)
+
             # Feature importance
             st.markdown("### 🔍 Feature Importance")
-            importances = model.best_estimator_.feature_importances_ if hasattr(model, "best_estimator_") else model.feature_importances_
+            if hasattr(model, "best_estimator_"):
+                importances = model.best_estimator_.feature_importances_
+            else:
+                importances = model.feature_importances_
             importance_df = pd.DataFrame({'Feature': X.columns, 'Importance': importances}).sort_values(by='Importance', ascending=False)
             st.dataframe(importance_df.head(10))
 
             # SHAP values (explainability)
             try:
-                explainer = shap.TreeExplainer(model)
+                explainer = shap.TreeExplainer(model.best_estimator_ if hasattr(model, "best_estimator_") else model)
                 shap_values = explainer.shap_values(X[:100])
                 st.markdown("### 🧠 SHAP Summary Plot")
                 shap.summary_plot(shap_values, X[:100], plot_type="bar", show=False)
@@ -286,7 +295,7 @@ def run_advanced_ml(df):
         except Exception as e:
             st.error(f"🚫 Error training model: {e}")
 
-def adv_analytics(df):
+def adv_analytics(df: pd.DataFrame) -> None:
     st.subheader("🔬 Advanced Analytics Playground")
     st.write("💡 Use Python code (pandas, numpy, plotly, etc.) to analyze the dataframe below:")
     code = st.text_area("Python code (your variable is 'df')", height=150)
