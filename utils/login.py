@@ -3,7 +3,7 @@ import streamlit as st
 
 def login_page():
     st.set_page_config(
-        page_title="InsideBox - Sign Up",
+        page_title="Data Analytics - Sign Up",
         page_icon="📦",
         layout="wide",
         initial_sidebar_state="collapsed"
