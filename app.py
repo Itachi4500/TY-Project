@@ -12,17 +12,11 @@ from utils.exporter import export_data
 from utils.memory import remember, recall, forget, clear_all_memory, show_memory, show_memory_history
 from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
-from utils.logger import get_logge
 
 warnings.filterwarnings("ignore")
 st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
 st.title("🧠 Enhanced Data Analysis Assistant")
-logger = get_logger("App")
 
-try:
-    logger.info("App started successfully!")
-except Exception as e:
-    logger.error(f"Error: {e}")
 
 # --- Session Initialization ---
 if "df" not in st.session_state:
