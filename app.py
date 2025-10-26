@@ -13,11 +13,17 @@ from utils.memory import remember, recall, forget, clear_all_memory, show_memory
 from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
 from pages.log_in import LOG_DIR
+from utils.auth import check_auth
+from utils.login import login_page
 
 warnings.filterwarnings("ignore")
 st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
 st.title("🧠 Enhanced Data Analysis Assistant")
 
+
+if not check_auth():
+    login_page()
+    st.stop()
 
 # --- Session Initialization ---
 if "df" not in st.session_state:
