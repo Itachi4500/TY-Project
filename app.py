@@ -12,7 +12,7 @@ from utils.exporter import export_data
 from utils.memory import remember, recall, forget, clear_all_memory, show_memory, show_memory_history
 from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
-from pages.log_in import LOG_DIR
+# from pages.log_in import LOG_DIR
 # from utils.auth import check_auth
 # from utils.login import login_page
 
