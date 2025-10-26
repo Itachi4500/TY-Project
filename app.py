@@ -2,7 +2,7 @@ import streamlit as st
 import warnings
 import pandas as pd
 import numpy as np
-from utils.login import login_page
+# from utils.login import login_page
 from utils.upload import upload_data
 from utils.cleaner import clean_data
 from utils.eda import run_eda
@@ -13,21 +13,21 @@ from utils.memory import remember, recall, forget, clear_all_memory, show_memory
 from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
 from pages.log_in import LOG_DIR
-from utils.auth import check_auth
-from utils.login import login_page
+# from utils.auth import check_auth
+# from utils.login import login_page
 
 warnings.filterwarnings("ignore")
 st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
 st.title("🧠 Enhanced Data Analysis Assistant")
 
 
-if not check_auth():
-    login_page()
-    st.stop()
+# if not check_auth():
+#     login_page()
+#     st.stop()
 
-# --- Session Initialization ---
-if "df" not in st.session_state:
-    st.session_state.df = None
+# # --- Session Initialization ---
+# if "df" not in st.session_state:
+#     st.session_state.df = None
 
 # --- Advanced Sidebar Navigation ---
 nav = st.sidebar.radio("📌 Navigation", [
