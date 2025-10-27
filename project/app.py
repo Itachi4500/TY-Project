@@ -2,7 +2,7 @@ import streamlit as st
 import warnings
 import pandas as pd
 import numpy as np
-from api_server app
+from api_server import app
 # from utils.login import login_page
 from utils.upload import upload_data
 from utils.cleaner import clean_data
