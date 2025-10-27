@@ -12,3 +12,8 @@ SMOTE
 imbalanced-learn
 Shap
 kaleido
+
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic>=2
