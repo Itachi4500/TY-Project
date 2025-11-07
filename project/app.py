@@ -18,7 +18,7 @@ from utils.refresh import refresh_data
 # from utils.login import login_page
 
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
+st.set_page_config(page_title="Visualizatio Assistant", layout="wide")
 st.title("🧠 Enhanced Data Analysis Assistant")
 
 
