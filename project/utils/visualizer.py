@@ -6,10 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def show_visuals(df):
-    """
-    Advanced Streamlit visualization module with upgraded charts and descriptive summaries.
-    """
-    st.title("📊 Advanced Data Visualization Dashboard")
+  
+    st.title("Visualization Dashboard")
 
     # --- Detect column types ---
     for col in df.select_dtypes(include='object').columns:
