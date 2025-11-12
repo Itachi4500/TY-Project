@@ -8,12 +8,8 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 
 def show_hypothesis_testing(df):
-    """
-    AI-Powered Smart Hypothesis Testing Suite
-    with automatic test recommendations, assumption checks,
-    and visual + statistical interpretation.
-    """
-    st.title("🧠 AI-Powered Hypothesis Testing Suite")
+ 
+    st.title("Hypothesis Testing ")
 
     # --- Detect Data Types ---
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
