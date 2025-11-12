@@ -143,8 +143,8 @@ elif nav == "Export":
 # --- Footer ---
 st.markdown("---")
 st.markdown(
-    "<p style='text-align:center; color:gray;'>"
-    "🧩 Enhanced Data Analysis Assistant © 2025 — Built with Streamlit, Plotly, and SciPy"
+    "<p style='text-align:center; color:golden;'>"
+    "🧩 Made by Prem And Manoj"
     "</p>",
     unsafe_allow_html=True,
 )
