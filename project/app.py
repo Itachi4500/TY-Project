@@ -2,66 +2,78 @@ import streamlit as st
 import warnings
 import pandas as pd
 import numpy as np
+
+# --- Local Imports ---
 from api_server import app
-# from utils.login import login_page
 from utils.upload import upload_data
 from utils.cleaner import clean_data
 from utils.eda import run_eda
-from utils.visualizer import show_visuals
-from utils.hypothesis_testing import show_hypothesis_testing
+from utils.visualizer import show_visuals  # ✅ Updated with advanced charts
+from utils.hypothesis_testing import show_hypothesis_testing  # ✅ Smart testing engine
 from utils.modeler import run_modeling
 from utils.exporter import export_data
-from utils.memory import remember, recall, forget, clear_all_memory, show_memory, show_memory_history
+from utils.memory import (
+    remember, recall, forget, clear_all_memory,
+    show_memory, show_memory_history
+)
 from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
-# from pages.log_in import LOG_DIR
-# from utils.auth import check_auth
+
+# Optional: Authentication (can be re-enabled later)
 # from utils.login import login_page
+# from utils.auth import check_auth
 
+# --- Configuration ---
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="Visualizatio Assistant", layout="wide")
+st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
 st.title("🧠 Enhanced Data Analysis Assistant")
+st.markdown("### Empowering Non-Coders with AI-Driven Analytics, Insights, and Visualization")
 
+# --- Session Initialization ---
+if "df" not in st.session_state:
+    st.session_state.df = None
 
+# Optional: Authentication
 # if not check_auth():
 #     login_page()
 #     st.stop()
 
-# # --- Session Initialization ---
-# if "df" not in st.session_state:
-#     st.session_state.df = None
-
-# --- Advanced Sidebar Navigation ---
-nav = st.sidebar.radio("📌 Navigation", [
-    "Refresh",
-    "Upload Data",
-    "Data Cleaning",
-    "EDA",
-    "Visualizations",
-    "Model Training",
-    "Power BI Pipeline",
-    "Memory & Notes",
-    "Export"
-])
+# --- Sidebar Navigation ---
+st.sidebar.title("📂 Main Navigation")
+nav = st.sidebar.radio(
+    "Go to Section:",
+    [
+        "Refresh",
+        "Upload Data",
+        "Data Cleaning",
+        "EDA (Exploratory Analysis)",
+        "Visualizations",
+        "Hypothesis Testing",
+        "Model Training",
+        "Power BI Pipeline",
+        "Memory & Notes",
+        "Export"
+    ],
+)
 
 # --- Navigation Routing ---
-if nav == "Upload Data":
+if nav == "Refresh":
+    refresh_data()
+
+elif nav == "Upload Data":
     df = upload_data()
     if df is not None:
         st.session_state.df = df
+        st.success("✅ Dataset uploaded successfully!")
         st.dataframe(df.head())
-
-elif nav == "Refresh":
-    refresh_data()
 
 elif nav == "Data Cleaning":
     if st.session_state.df is not None:
-        df_cleaned = clean_data(st.session_state.df)
-        st.session_state.df = df_cleaned
+        st.session_state.df = clean_data(st.session_state.df)
     else:
         st.warning("📂 Please upload a dataset first.")
 
-elif nav == "EDA":
+elif nav == "EDA (Exploratory Analysis)":
     if st.session_state.df is not None:
         run_eda(st.session_state.df)
     else:
@@ -70,6 +82,12 @@ elif nav == "EDA":
 elif nav == "Visualizations":
     if st.session_state.df is not None:
         show_visuals(st.session_state.df)
+    else:
+        st.warning("📂 Please upload a dataset first.")
+
+elif nav == "Hypothesis Testing":
+    if st.session_state.df is not None:
+        show_hypothesis_testing(st.session_state.df)
     else:
         st.warning("📂 Please upload a dataset first.")
 
@@ -86,22 +104,48 @@ elif nav == "Power BI Pipeline":
         st.warning("📂 Please upload a dataset first.")
 
 elif nav == "Memory & Notes":
+    st.subheader("🧠 Memory & Notes Center")
+    st.markdown("Use this section to store or recall analysis notes, key results, or reminders.")
+    
+    # --- Memory Overview ---
     show_memory()
     show_memory_history()
-    with st.expander("➕ Add Note"):
-        key = st.text_input("Memory Key (e.g. 'notes.data.cleaning')")
-        value = st.text_area("Memory Value")
-        if st.button("💾 Remember"):
-            remember(key, value)
-    with st.expander("❌ Forget Note"):
+
+    # --- Add Note ---
+    with st.expander("➕ Add Note to Memory"):
+        key = st.text_input("🗝️ Memory Key (e.g. 'notes.data.cleaning')")
+        value = st.text_area("🧾 Memory Value")
+        if st.button("💾 Save Note"):
+            if key and value:
+                remember(key, value)
+                st.success(f"Saved memory under key: `{key}`")
+            else:
+                st.warning("Please provide both key and value.")
+
+    # --- Forget Note ---
+    with st.expander("❌ Forget Specific Note"):
         forget_key = st.text_input("Key to forget")
-        if st.button("Forget"):
-            forget(forget_key)
+        if st.button("🗑 Forget Note"):
+            if forget_key:
+                forget(forget_key)
+                st.info(f"Forgot memory with key: `{forget_key}`")
+
+    # --- Clear All Memory ---
     if st.button("🧹 Clear All Memory"):
         clear_all_memory()
+        st.warning("All memory cleared.")
 
 elif nav == "Export":
     if st.session_state.df is not None:
         export_data(st.session_state.df)
     else:
         st.warning("📂 Please upload a dataset first.")
+
+# --- Footer ---
+st.markdown("---")
+st.markdown(
+    "<p style='text-align:center; color:gray;'>"
+    "🧩 Enhanced Data Analysis Assistant © 2025 — Built with Streamlit, Plotly, and SciPy"
+    "</p>",
+    unsafe_allow_html=True,
+)
