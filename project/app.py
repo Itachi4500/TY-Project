@@ -8,8 +8,8 @@ from api_server import app
 from utils.upload import upload_data
 from utils.cleaner import clean_data
 from utils.eda import run_eda
-from utils.visualizer import show_visuals  # ✅ Updated with advanced charts
-from utils.hypothesis_testing import show_hypothesis_testing  # ✅ Smart testing engine
+from utils.visualizer import show_visuals  
+from utils.hypothesis_testing import show_hypothesis_testing  
 from utils.modeler import run_modeling
 from utils.exporter import export_data
 from utils.memory import (
@@ -25,9 +25,8 @@ from utils.refresh import refresh_data
 
 # --- Configuration ---
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="🧠 Enhanced Data Analysis Assistant", layout="wide")
-st.title("🧠 Enhanced Data Analysis Assistant")
-st.markdown("### Empowering Non-Coders with AI-Driven Analytics, Insights, and Visualization")
+st.set_page_config(page_title="Data Analysis Assistant", layout="wide")
+st.title("Data Analysis Assistant")
 
 # --- Session Initialization ---
 if "df" not in st.session_state:
