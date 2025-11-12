@@ -8,6 +8,7 @@ from utils.upload import upload_data
 from utils.cleaner import clean_data
 from utils.eda import run_eda
 from utils.visualizer import show_visuals
+from utils.hypothesis_testing import show_hypothesis_testing
 from utils.modeler import run_modeling
 from utils.exporter import export_data
 from utils.memory import remember, recall, forget, clear_all_memory, show_memory, show_memory_history
