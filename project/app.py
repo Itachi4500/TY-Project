@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # --- Local Imports ---
-from api_server import app
+# from api_server import app
 from utils.upload import upload_data
 from utils.cleaner import clean_data
 from utils.eda import run_eda
