@@ -7,35 +7,34 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score, f1_score, precision_score, recall_score,
-    classification_report, confusion_matrix
+    classification_report, confusion_matrix,
+    r2_score, mean_squared_error, mean_absolute_error
 )
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.svm import SVC, SVR
 from sklearn.naive_bayes import GaussianNB
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.semi_supervised import SelfTrainingClassifier
 from imblearn.over_sampling import SMOTE
 
 
 def run_modeling(df):
     """
-    🤖 AI AutoML Model Builder with Self-Training & SMOTE
-    - Auto-encodes categorical columns
-    - Automatically balances data using SMOTE
-    - Trains & compares multiple algorithms
-    - Displays leaderboard of model performance
-    - Shows feature importance and confusion matrix
+    🤖 AI AutoML Model Builder with Automatic Classification/Regression Mode
+    + SMOTE balancing (for classification)
+    + Self-Training support (semi-supervised)
+    + Auto feature scaling, feature importance, confusion/regression charts
     """
-    st.subheader("🤖 AI AutoML Model Builder + Self-Training + SMOTE")
+    st.subheader("🧠 AI AutoML Model Builder (Classification + Regression)")
 
     if df is None or df.empty:
         st.error("❌ The dataset is empty. Please upload a valid dataset.")
         return
 
-    # --- Auto Encode Categoricals ---
+    # --- Encode categorical variables ---
     cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
     if cat_cols:
         st.info(f"🔤 Encoding {len(cat_cols)} categorical columns automatically...")
@@ -48,115 +47,116 @@ def run_modeling(df):
         st.warning("⚠️ Please select a target column.")
         return
 
-    try:
-        X = df.drop(columns=[target])
-        y = df[target]
+    X = df.drop(columns=[target])
+    y = df[target]
 
-        if X.empty:
-            st.error("❌ No feature columns available for modeling.")
-            return
+    if X.empty:
+        st.error("❌ No feature columns available for modeling.")
+        return
 
-        # --- Encode target if categorical ---
-        if y.dtype == "object" or str(y.dtype).startswith("category"):
-            y = LabelEncoder().fit_transform(y)
+    # --- Detect Task Type ---
+    if pd.api.types.is_numeric_dtype(y) and y.nunique() > 15:
+        task_type = "regression"
+    else:
+        task_type = "classification"
 
-        # --- Optional Feature Scaling ---
-        if st.checkbox("⚙️ Standardize Numeric Features (Z-Score Scaling)"):
-            scaler = StandardScaler()
-            X[X.columns] = scaler.fit_transform(X[X.columns])
-            st.success("✅ Numeric features standardized.")
+    st.markdown(f"### 🔍 Detected Task Type: **{task_type.title()}**")
 
-        # --- Show Class Distribution ---
-        st.markdown("### 🎯 Target Label Distribution (Before Split)")
-        st.dataframe(pd.Series(y).value_counts().rename_axis("Label").reset_index(name="Count"))
+    # --- Optional Scaling ---
+    if st.checkbox("⚙️ Standardize Numeric Features (Z-Score Scaling)"):
+        scaler = StandardScaler()
+        X[X.columns] = scaler.fit_transform(X[X.columns])
+        st.success("✅ Features standardized successfully.")
 
-        # --- Safe Split ---
-        test_size = st.slider("🔀 Test Size (%)", 10, 50, 30)
-        unique_classes, counts = np.unique(y, return_counts=True)
-        stratify_opt = y if min(counts) >= 2 else None
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size / 100, stratify=stratify_opt, random_state=42
-        )
+    # --- Split Dataset ---
+    test_size = st.slider("🔀 Test Size (%)", 10, 50, 30)
+    stratify_opt = y if (task_type == "classification" and y.nunique() > 1) else None
 
-        # --- Apply SMOTE Balancing ---
-        st.markdown("### ⚖️ Applying SMOTE to Balance Classes")
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=test_size / 100, stratify=stratify_opt, random_state=42
+    )
+
+    # --- Apply SMOTE only for Classification ---
+    if task_type == "classification":
+        st.markdown("### ⚖️ Applying SMOTE Balancing on Training Data")
         try:
-            sm = SMOTE(random_state=42, k_neighbors=min(5, max(1, min(counts) - 1)))
+            sm = SMOTE(random_state=42, k_neighbors=min(5, y_train.value_counts().min() - 1))
             X_train, y_train = sm.fit_resample(X_train, y_train)
-            st.success("✅ SMOTE applied successfully.")
+            st.success("✅ SMOTE applied successfully (classes balanced).")
         except Exception as e:
             st.warning(f"⚠️ SMOTE skipped: {e}")
 
-        # --- Semi-supervised Unlabeled Simulation ---
-        unlabeled_ratio = st.slider("❓ % of Unlabeled Training Data (for Self-Training)", 10, 90, 30)
-        unlabeled_mask = np.random.rand(len(y_train)) < (unlabeled_ratio / 100)
-        y_train_partial = np.copy(y_train)
-        y_train_partial[~unlabeled_mask] = -1
-
-        st.markdown("### 🧩 Label Distribution (After SMOTE & Semi-supervised Split)")
-        label_dist = pd.Series(y_train_partial).replace(-1, "Unlabeled").value_counts()
-        st.dataframe(label_dist.rename_axis("Label").reset_index(name="Count"))
-
-        # --- Model List for AutoML Comparison ---
-        st.markdown("## ⚙️ Model Configuration")
-
+    # --- Define Models Dynamically ---
+    if task_type == "classification":
         models = {
-            "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1),
-            "Logistic Regression": LogisticRegression(max_iter=500, solver="lbfgs"),
+            "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42),
+            "Logistic Regression": LogisticRegression(max_iter=500),
             "Decision Tree": DecisionTreeClassifier(random_state=42),
             "Naive Bayes": GaussianNB(),
-            "SVM (RBF Kernel)": SVC(kernel="rbf", probability=True, random_state=42),
-            "Gradient Boosting": GradientBoostingClassifier(random_state=42)
+            "SVM (RBF Kernel)": SVC(probability=True, random_state=42),
+            "Gradient Boosting": GradientBoostingClassifier(random_state=42),
+        }
+        if st.checkbox("🧠 Include Self-Training (Semi-Supervised)", True):
+            models["Self-Training (Random Forest)"] = SelfTrainingClassifier(RandomForestClassifier(n_estimators=100, random_state=42))
+    else:
+        models = {
+            "Random Forest Regressor": RandomForestRegressor(n_estimators=200, random_state=42),
+            "Linear Regression": LinearRegression(),
+            "Decision Tree Regressor": DecisionTreeRegressor(random_state=42),
+            "SVR (RBF Kernel)": SVR(kernel="rbf"),
+            "Gradient Boosting Regressor": GradientBoostingRegressor(random_state=42),
         }
 
-        include_self_training = st.checkbox("🧠 Include Self-Training (Semi-Supervised Mode)", True)
-        if include_self_training:
-            base_rf = RandomForestClassifier(n_estimators=100, random_state=42)
-            models["Self-Training (Random Forest)"] = SelfTrainingClassifier(base_rf)
+    # --- Train and Evaluate Models ---
+    st.markdown("## 🧠 Training Models & Comparing Performance...")
+    results = []
+    progress_bar = st.progress(0)
 
-        # --- Train & Evaluate Models ---
-        st.markdown("## 🧠 Training Models & Comparing Performance...")
-        results = []
-        progress_bar = st.progress(0)
-        total_models = len(models)
+    for i, (name, model) in enumerate(models.items(), 1):
+        try:
+            with st.spinner(f"Training {name}..."):
+                model.fit(X_train, y_train)
+                preds = model.predict(X_test)
 
-        for i, (name, model) in enumerate(models.items(), 1):
-            try:
-                with st.spinner(f"Training {name}..."):
-                    model.fit(X_train, y_train_partial)
-                    preds = model.predict(X_test)
+                if task_type == "classification":
                     acc = accuracy_score(y_test, preds)
                     f1 = f1_score(y_test, preds, average="weighted")
                     prec = precision_score(y_test, preds, average="weighted")
                     rec = recall_score(y_test, preds, average="weighted")
                     results.append([name, acc, f1, prec, rec])
-                progress_bar.progress(i / total_models)
-            except Exception as e:
-                st.warning(f"⚠️ {name} failed: {e}")
+                else:
+                    r2 = r2_score(y_test, preds)
+                    mae = mean_absolute_error(y_test, preds)
+                    rmse = np.sqrt(mean_squared_error(y_test, preds))
+                    results.append([name, r2, mae, rmse])
+        except Exception as e:
+            st.warning(f"⚠️ {name} failed: {e}")
+        progress_bar.progress(i / len(models))
 
-        # --- Show Leaderboard ---
+    # --- Results Table ---
+    if task_type == "classification":
         results_df = pd.DataFrame(results, columns=["Model", "Accuracy", "F1-Score", "Precision", "Recall"])
-        results_df = results_df.sort_values(by="F1-Score", ascending=False)
-        st.success("✅ Model Comparison Complete!")
+        best_model_name = results_df.iloc[results_df["F1-Score"].idxmax()]["Model"]
+    else:
+        results_df = pd.DataFrame(results, columns=["Model", "R²", "MAE", "RMSE"])
+        best_model_name = results_df.iloc[results_df["R²"].idxmax()]["Model"]
 
-        st.markdown("### 🏆 Model Performance Leaderboard")
-        st.dataframe(results_df.reset_index(drop=True).style.highlight_max(axis=0, color="lightgreen"))
+    st.success("✅ Model Comparison Complete!")
+    st.dataframe(results_df.style.highlight_max(axis=0, color="lightgreen"))
 
-        # --- Highlight Best Model ---
-        best_model_name = results_df.iloc[0]["Model"]
-        best_acc = results_df.iloc[0]["Accuracy"]
-        st.balloons()
-        st.markdown(f"🎉 **Best Model:** `{best_model_name}` with Accuracy = {best_acc:.4f}")
+    # --- Best Model ---
+    best_model = models[best_model_name]
+    st.markdown(f"🏆 **Best Model:** `{best_model_name}`")
+    st.balloons()
 
-        # --- Optional: Re-train Best Model on Full Data ---
-        if st.checkbox("🔁 Retrain Best Model on Full Data"):
-            best_model = models[best_model_name]
-            best_model.fit(X, y)
-            st.success(f"✅ {best_model_name} retrained on full dataset.")
+    # --- Retrain on Full Data ---
+    if st.checkbox("🔁 Retrain Best Model on Full Dataset"):
+        best_model.fit(X, y)
+        st.success(f"✅ {best_model_name} retrained on full dataset.")
 
-        # --- Confusion Matrix for Best Model ---
+    # --- Visualization ---
+    if task_type == "classification":
         st.markdown("### 🔲 Confusion Matrix (Best Model)")
-        best_model = models[best_model_name]
         preds = best_model.predict(X_test)
         cm = confusion_matrix(y_test, preds)
         fig, ax = plt.subplots()
@@ -165,39 +165,40 @@ def run_modeling(df):
         plt.ylabel("Actual")
         plt.title(f"Confusion Matrix - {best_model_name}")
         st.pyplot(fig)
+    else:
+        st.markdown("### 📈 Regression Performance")
+        preds = best_model.predict(X_test)
+        fig, ax = plt.subplots()
+        sns.scatterplot(x=y_test, y=preds, alpha=0.7)
+        plt.xlabel("Actual")
+        plt.ylabel("Predicted")
+        plt.title(f"{best_model_name} Predictions vs Actuals")
+        st.pyplot(fig)
+        st.info(f"R² = {r2_score(y_test, preds):.4f}, RMSE = {np.sqrt(mean_squared_error(y_test, preds)):.4f}")
 
-        # --- Feature Importance (if supported) ---
+    # --- Feature Importance ---
+    if hasattr(best_model, "feature_importances_"):
         st.markdown("### 🌟 Feature Importance")
-        if hasattr(best_model, "feature_importances_"):
-            importance_df = pd.DataFrame({
-                "Feature": X.columns,
-                "Importance": best_model.feature_importances_
-            }).sort_values(by="Importance", ascending=False)
-            st.dataframe(importance_df)
-            fig, ax = plt.subplots()
-            sns.barplot(
-                data=importance_df.head(15),
-                x="Importance",
-                y="Feature",
-                ax=ax
-            )
-            plt.title("Top Feature Importances")
-            st.pyplot(fig)
+        importance_df = pd.DataFrame({
+            "Feature": X.columns,
+            "Importance": best_model.feature_importances_
+        }).sort_values(by="Importance", ascending=False)
+        st.dataframe(importance_df)
+        fig, ax = plt.subplots()
+        sns.barplot(data=importance_df.head(15), x="Importance", y="Feature", ax=ax)
+        plt.title("Top Feature Importances")
+        st.pyplot(fig)
+
+    # --- New Data Prediction ---
+    st.markdown("### 🔮 Predict on New Data")
+    uploaded_file = st.file_uploader("Upload New Data for Prediction (CSV)", type=["csv"])
+    if uploaded_file:
+        new_df = pd.read_csv(uploaded_file)
+        missing = [c for c in X.columns if c not in new_df.columns]
+        if missing:
+            st.error(f"❌ Missing columns: {missing}")
         else:
-            st.info(f"ℹ️ Feature importances not available for {best_model_name}")
+            preds = best_model.predict(new_df[X.columns])
+            st.dataframe(pd.DataFrame({"Prediction": preds}))
+            st.success("✅ Predictions completed!")
 
-        # --- Prediction on New Data ---
-        st.markdown("### 🔮 Make Predictions on New Data")
-        uploaded_file = st.file_uploader("Upload New Data for Prediction (CSV)", type=["csv"])
-        if uploaded_file:
-            new_df = pd.read_csv(uploaded_file)
-            missing_cols = [c for c in X.columns if c not in new_df.columns]
-            if missing_cols:
-                st.error(f"❌ Missing columns in uploaded file: {missing_cols}")
-            else:
-                preds = best_model.predict(new_df[X.columns])
-                st.dataframe(pd.DataFrame({"Prediction": preds}))
-                st.success("✅ Predictions completed!")
-
-    except Exception as e:
-        st.error(f"❌ Error during modeling: {e}")
