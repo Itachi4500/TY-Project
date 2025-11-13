@@ -94,7 +94,7 @@ def run_modeling(df):
     - Automatically adds optional models when libraries available.
     - Option to enable GPU acceleration (if supported by installed libs).
     """
-    st.subheader("🤖 AutoML + XGBoost/LightGBM/CatBoost + SHAP")
+    st.subheader("AutoML + XGBoost/LightGBM/CatBoost + SHAP")
 
     if df is None or df.empty:
         st.error("❌ Empty dataset — please upload a valid dataset.")
@@ -245,7 +245,7 @@ def run_modeling(df):
         models["Self-Training (RF)"] = SelfTrainingClassifier(RandomForestClassifier(n_estimators=100, random_state=42))
 
     # --- Train & evaluate models ---
-    st.markdown("## ▶️ Training models (this may take a while depending on dataset & models)...")
+    st.markdown("## ▶️ Training models")
     results = []
     progress = st.progress(0)
     total = len(models)
@@ -293,7 +293,7 @@ def run_modeling(df):
     st.dataframe(results_df.style.highlight_max(axis=0, color="lightgreen"))
 
     best_model_name = results_df.iloc[0]["Model"]
-    st.markdown(f"### 🏆 Best model: **{best_model_name}**")
+    st.markdown(f"### Best model: **{best_model_name}**")
 
     # retrieve best model object
     best_model = None
@@ -350,7 +350,7 @@ def run_modeling(df):
 
     # --- SHAP explainability (best-effort) ---
     if shap_spec:
-        st.markdown("### 🔍 SHAP Explainability (Best Model) — best-effort")
+        st.markdown("###  SHAP Explainability (Best Model) — best-effort")
         try:
             # choose a reasonable sample for SHAP (to keep compute moderate)
             sample_size = min(200, X_test.shape[0])
@@ -394,7 +394,7 @@ def run_modeling(df):
         st.info("Install `shap` to enable SHAP explainability (pip install shap).")
 
     # --- Predict on new uploaded data ---
-    st.markdown("### 🔮 Make predictions on new data (CSV)")
+    st.markdown("### Make predictions on new data (CSV)")
     uploaded_file = st.file_uploader("Upload new CSV for prediction (must contain training features)", type=["csv"])
     if uploaded_file:
         new_df = pd.read_csv(uploaded_file)
