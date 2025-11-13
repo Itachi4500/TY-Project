@@ -25,8 +25,8 @@ from utils.refresh import refresh_data
 
 # --- Configuration ---
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="Data Analysis Assistant", layout="wide")
-st.title("Data Analysis Assistant")
+st.set_page_config(page_title="Smart Data Analysis Assistant: Simplified with AI", layout="wide")
+st.title("Smart Data Analysis Assistant: Simplified with AI")
 
 # --- Session Initialization ---
 if "df" not in st.session_state:
