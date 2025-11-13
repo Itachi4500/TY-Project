@@ -131,7 +131,7 @@ def run_modeling(df):
         st.success("✅ Features standardized")
 
     # --- split dataset safely ---
-    test_size = st.slider("🔀 Test size (%)", 10, 50, 30)
+    test_size = st.slider("🔀 Test size (%)", 10, 100, 30)
     stratify_opt = y if (task_type == "classification" and y.nunique() > 1) else None
     try:
         X_train, X_test, y_train, y_test = train_test_split(
