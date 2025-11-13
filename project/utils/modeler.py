@@ -11,8 +11,10 @@ from sklearn.metrics import (
     r2_score, mean_squared_error, mean_absolute_error
 )
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.utils.class_weight import compute_class_weight
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
+from sklearn.ensemble import (
+    RandomForestClassifier, RandomForestRegressor,
+    GradientBoostingClassifier, GradientBoostingRegressor
+)
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.svm import SVC, SVR
 from sklearn.naive_bayes import GaussianNB
@@ -21,14 +23,52 @@ from sklearn.semi_supervised import SelfTrainingClassifier
 from imblearn.over_sampling import SMOTE
 
 
+def interpret_classification_results(acc, f1, prec, rec):
+    """Interpret classification model results"""
+    avg_score = np.mean([acc, f1, prec, rec])
+    if avg_score > 0.90:
+        verdict = "🏆 **Excellent Model!** Your classifier performs extremely well with strong predictive accuracy."
+    elif avg_score > 0.75:
+        verdict = "✅ **Good Model.** Balanced precision, recall, and accuracy. Reliable for production use."
+    elif avg_score > 0.60:
+        verdict = "⚠️ **Moderate Performance.** The model is decent but may benefit from tuning or feature engineering."
+    else:
+        verdict = "❌ **Poor Model.** Try feature selection, scaling, or a different algorithm."
+    tips = [
+        "- Try hyperparameter tuning (GridSearchCV).",
+        "- Remove noisy or redundant features.",
+        "- Collect more samples for underrepresented classes.",
+        "- Experiment with ensemble methods like XGBoost or LightGBM."
+    ]
+    return verdict, tips
+
+
+def interpret_regression_results(r2, rmse, mae):
+    """Interpret regression model results"""
+    if r2 > 0.90:
+        verdict = "🏆 **Excellent Model!** Explains most of the variance with minimal error."
+    elif r2 > 0.75:
+        verdict = "✅ **Good Model.** Strong predictive power with reasonable error margin."
+    elif r2 > 0.50:
+        verdict = "⚠️ **Moderate Model.** Can be improved with feature selection or model tuning."
+    else:
+        verdict = "❌ **Weak Model.** Consider non-linear models, scaling, or more data."
+    tips = [
+        "- Use polynomial or interaction features.",
+        "- Tune hyperparameters for tree-based models.",
+        "- Check for outliers or heteroscedasticity.",
+        "- Try Gradient Boosting or XGBoost for complex patterns."
+    ]
+    return verdict, tips
+
+
 def run_modeling(df):
     """
     🤖 AI AutoML Model Builder with Automatic Classification/Regression Mode
     + SMOTE balancing (for classification)
-    + Self-Training support (semi-supervised)
-    + Auto feature scaling, feature importance, confusion/regression charts
+    + Outcome interpretation and improvement tips
     """
-    st.subheader("🧠 AI AutoML Model Builder (Classification + Regression)")
+    st.subheader("🧠 AI AutoML Model Builder (with Outcome Interpretation)")
 
     if df is None or df.empty:
         st.error("❌ The dataset is empty. Please upload a valid dataset.")
@@ -55,30 +95,25 @@ def run_modeling(df):
         return
 
     # --- Detect Task Type ---
-    if pd.api.types.is_numeric_dtype(y) and y.nunique() > 15:
-        task_type = "regression"
-    else:
-        task_type = "classification"
-
+    task_type = "regression" if pd.api.types.is_numeric_dtype(y) and y.nunique() > 15 else "classification"
     st.markdown(f"### 🔍 Detected Task Type: **{task_type.title()}**")
 
-    # --- Optional Scaling ---
+    # --- Scaling ---
     if st.checkbox("⚙️ Standardize Numeric Features (Z-Score Scaling)"):
         scaler = StandardScaler()
         X[X.columns] = scaler.fit_transform(X[X.columns])
         st.success("✅ Features standardized successfully.")
 
     # --- Split Dataset ---
-    test_size = st.slider("🔀 Test Size (%)", 10, 100, 30)
+    test_size = st.slider("🔀 Test Size (%)", 10, 50, 30)
     stratify_opt = y if (task_type == "classification" and y.nunique() > 1) else None
-
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size / 100, stratify=stratify_opt, random_state=42
     )
 
-    # --- Apply SMOTE only for Classification ---
+    # --- Apply SMOTE for Classification ---
     if task_type == "classification":
-        st.markdown("### ⚖️ Applying SMOTE Balancing on Training Data")
+        st.markdown("### ⚖️ Balancing Classes with SMOTE")
         try:
             sm = SMOTE(random_state=42, k_neighbors=min(5, y_train.value_counts().min() - 1))
             X_train, y_train = sm.fit_resample(X_train, y_train)
@@ -86,7 +121,7 @@ def run_modeling(df):
         except Exception as e:
             st.warning(f"⚠️ SMOTE skipped: {e}")
 
-    # --- Define Models Dynamically ---
+    # --- Define Models ---
     if task_type == "classification":
         models = {
             "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42),
@@ -107,7 +142,7 @@ def run_modeling(df):
             "Gradient Boosting Regressor": GradientBoostingRegressor(random_state=42),
         }
 
-    # --- Train and Evaluate Models ---
+    # --- Train & Evaluate ---
     st.markdown("## 🧠 Training Models & Comparing Performance...")
     results = []
     progress_bar = st.progress(0)
@@ -133,7 +168,7 @@ def run_modeling(df):
             st.warning(f"⚠️ {name} failed: {e}")
         progress_bar.progress(i / len(models))
 
-    # --- Results Table ---
+    # --- Display Results ---
     if task_type == "classification":
         results_df = pd.DataFrame(results, columns=["Model", "Accuracy", "F1-Score", "Precision", "Recall"])
         best_model_name = results_df.iloc[results_df["F1-Score"].idxmax()]["Model"]
@@ -144,9 +179,23 @@ def run_modeling(df):
     st.success("✅ Model Comparison Complete!")
     st.dataframe(results_df.style.highlight_max(axis=0, color="lightgreen"))
 
-    # --- Best Model ---
-    best_model = models[best_model_name]
+    # --- Outcome Interpretation ---
+    st.markdown("### 🧩 Model Outcome Interpretation")
+    if task_type == "classification":
+        best_row = results_df[results_df["Model"] == best_model_name].iloc[0]
+        verdict, tips = interpret_classification_results(best_row["Accuracy"], best_row["F1-Score"], best_row["Precision"], best_row["Recall"])
+    else:
+        best_row = results_df[results_df["Model"] == best_model_name].iloc[0]
+        verdict, tips = interpret_regression_results(best_row["R²"], best_row["RMSE"], best_row["MAE"])
+
+    st.markdown(verdict)
+    with st.expander("💡 Improvement Suggestions"):
+        for tip in tips:
+            st.write(tip)
+
+    # --- Best Model Section ---
     st.markdown(f"🏆 **Best Model:** `{best_model_name}`")
+    best_model = models[best_model_name]
     st.balloons()
 
     # --- Retrain on Full Data ---
@@ -154,7 +203,7 @@ def run_modeling(df):
         best_model.fit(X, y)
         st.success(f"✅ {best_model_name} retrained on full dataset.")
 
-    # --- Visualization ---
+    # --- Visualizations ---
     if task_type == "classification":
         st.markdown("### 🔲 Confusion Matrix (Best Model)")
         preds = best_model.predict(X_test)
@@ -174,7 +223,6 @@ def run_modeling(df):
         plt.ylabel("Predicted")
         plt.title(f"{best_model_name} Predictions vs Actuals")
         st.pyplot(fig)
-        st.info(f"R² = {r2_score(y_test, preds):.4f}, RMSE = {np.sqrt(mean_squared_error(y_test, preds)):.4f}")
 
     # --- Feature Importance ---
     if hasattr(best_model, "feature_importances_"):
@@ -189,7 +237,7 @@ def run_modeling(df):
         plt.title("Top Feature Importances")
         st.pyplot(fig)
 
-    # --- New Data Prediction ---
+    # --- Predictions on New Data ---
     st.markdown("### 🔮 Predict on New Data")
     uploaded_file = st.file_uploader("Upload New Data for Prediction (CSV)", type=["csv"])
     if uploaded_file:
@@ -201,4 +249,3 @@ def run_modeling(df):
             preds = best_model.predict(new_df[X.columns])
             st.dataframe(pd.DataFrame({"Prediction": preds}))
             st.success("✅ Predictions completed!")
-
