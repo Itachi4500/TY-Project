@@ -20,8 +20,8 @@ from utils.powerbi_pipeline import powerbi_pipeline
 from utils.refresh import refresh_data
 
 # Optional: Authentication (can be re-enabled later)
-from utils.login import login_page
-from utils.auth import check_auth
+# from utils.login import login_page
+# from utils.auth import check_auth
 
 # --- Configuration ---
 warnings.filterwarnings("ignore")
@@ -33,9 +33,9 @@ if "df" not in st.session_state:
     st.session_state.df = None
 
 # Optional: Authentication
-if not check_auth():
-    login_page()
-    st.stop()
+# if not check_auth():
+#     login_page()
+#     st.stop()
 
 # --- Sidebar Navigation ---
 st.sidebar.title("📂 Main Navigation")
