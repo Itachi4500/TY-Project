@@ -18,7 +18,7 @@ def upload_data(preview_rows=5):
         try:
             # File Info
             st.markdown(f"**Filename:** `{uploaded_file.name}`")
-            st.markdown(f"**Size:** `{round(uploaded_file.size / 1024, 2)} KB`")
+            st.markdown(f"**Size:** `{round(uploaded_file.size / 1024, 200)} KB`") # 2 to 200
 
             # Read File
             if uploaded_file.name.endswith(".csv"):
